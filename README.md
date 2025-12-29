@@ -261,6 +261,26 @@ After training, we evaluate by:
 
 For comparison: supervised ViT on CIFAR-10 achieves ~85%+
 
+### t-SNE Visualization of Learned Features
+
+To visualize how well the model separates different classes in embedding space:
+
+```bash
+PYTHONPATH=. python scripts/visualize_tsne.py --checkpoint checkpoints_300ep/checkpoint_latest.pt
+```
+
+**Target Encoder Features (300 epochs):**
+
+![t-SNE Target Encoder](tsne_target_encoder.png)
+
+**Key observations:**
+- **Vehicles** (airplane, automobile, ship, truck) cluster on the left
+- **Animals** spread across the right with distinct sub-clusters
+- **Frogs** form a tight, well-separated cluster
+- **Ships** clearly distinguished from other classes
+
+This demonstrates I-JEPA learns meaningful semantic features **without any labels** during training!
+
 ### Why Accuracy Isn't Everything
 
 The goal of I-JEPA is to learn **transferable representations**, not to achieve high accuracy on the pretraining dataset. Benefits emerge when:
@@ -306,10 +326,12 @@ ijepa-homemade/
 │   │   ├── scheduler.py    # LR and momentum schedules
 │   │   └── ema.py          # EMA update utility
 │   └── evaluation/
-│       └── linear_probe.py # Linear evaluation protocol
+│       ├── linear_probe.py # Linear evaluation protocol
+│       └── visualize.py    # t-SNE visualization
 ├── tests/                   # Unit tests (166 tests)
 ├── scripts/
-│   └── train_cifar10.py    # Training script
+│   ├── train_cifar10.py    # Training script
+│   └── visualize_tsne.py   # t-SNE visualization script
 └── checkpoints/            # Saved models (gitignored)
 ```
 
