@@ -1,0 +1,18 @@
+{
+  "Local I-JEPA (Target)": {
+    "variance_explained_10pc": 0.30177515745162964,
+    "variance_explained_50pc": 0.8059691190719604,
+    "silhouette_score": 0.005101948510855436,
+    "nn_precision@5": 0.4982,
+    "embed_dim": 192,
+    "num_samples": 2000
+  },
+  "HF I-JEPA (ijepa_vith14_1k)": {
+    "variance_explained_10pc": 0.4989376962184906,
+    "variance_explained_50pc": 0.784212052822113,
+    "silhouette_score": 0.033768180757761,
+    "nn_precision@5": 0.6848,
+    "embed_dim": 1280,
+    "num_samples": 2000
+  }
+}
