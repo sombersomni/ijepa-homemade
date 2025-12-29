@@ -2,28 +2,66 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 
 # Virtual environments
 venv/
 env/
 .venv/
+.env
 
-# Data (downloaded datasets)
-/data/
+# Data and datasets
+data/
+datasets/
+*.tar
 *.tar.gz
+*.zip
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.csv
+*.parquet
 
-# Checkpoints and logs
+# Model checkpoints and weights
 checkpoints/
+weights/
+models/
 *.pt
 *.pth
-wandb/
+*.ckpt
+*.safetensors
+*.onnx
+
+# Logs and outputs
+logs/
 runs/
+outputs/
+results/
+wandb/
+tensorboard/
+*.log
+
+# Jupyter notebooks
+.ipynb_checkpoints/
 
 # IDE
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Secrets and credentials
+*.pem
+*.key
+secrets.yaml
+credentials.json
+.env.local
+.env.*.local
