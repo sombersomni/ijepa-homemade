@@ -24,4 +24,7 @@ def update_ema(
         source_model: Model to copy from (context encoder)
         momentum: EMA momentum (0.996 -> 1.0 during training)
     """
-    raise NotImplementedError("update_ema not yet implemented")
+    for param_t, param_s in zip(
+        target_model.parameters(), source_model.parameters()
+    ):
+        param_t.data.mul_(momentum).add_(param_s.data, alpha=1 - momentum)

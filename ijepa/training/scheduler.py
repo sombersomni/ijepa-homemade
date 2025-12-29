@@ -31,7 +31,26 @@ def cosine_scheduler(
     Returns:
         Array of scheduled values for each step
     """
-    raise NotImplementedError("cosine_scheduler not yet implemented")
+    total_steps = epochs * steps_per_epoch
+    warmup_steps = warmup_epochs * steps_per_epoch
+
+    schedule = np.zeros(total_steps)
+
+    # Warmup phase: linear increase
+    if warmup_steps > 0:
+        schedule[:warmup_steps] = np.linspace(
+            warmup_start_value, base_value, warmup_steps
+        )
+
+    # Cosine annealing phase
+    cosine_steps = total_steps - warmup_steps
+    if cosine_steps > 0:
+        cosine_schedule = final_value + 0.5 * (base_value - final_value) * (
+            1 + np.cos(np.pi * np.arange(cosine_steps) / cosine_steps)
+        )
+        schedule[warmup_steps:] = cosine_schedule
+
+    return schedule
 
 
 def get_momentum_schedule(
@@ -54,4 +73,5 @@ def get_momentum_schedule(
     Returns:
         Array of momentum values for each step
     """
-    raise NotImplementedError("get_momentum_schedule not yet implemented")
+    total_steps = epochs * steps_per_epoch
+    return np.linspace(base_momentum, final_momentum, total_steps)
