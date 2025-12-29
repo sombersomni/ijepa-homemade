@@ -204,13 +204,13 @@ pip install torch torchvision numpy tqdm pytest
 
 ```bash
 # Set PYTHONPATH and run training
-PYTHONPATH=. python scripts/quick_train.py
+PYTHONPATH=. python scripts/train_cifar10.py
 ```
 
 Or modify the config for a quick test:
 
 ```python
-# scripts/quick_train.py
+# scripts/train_cifar10.py
 config = {
     'img_size': 32,
     'patch_size': 4,           # 8x8 = 64 patches per image
@@ -303,7 +303,7 @@ ijepa-homemade/
 │       └── linear_probe.py # Linear evaluation protocol
 ├── tests/                   # Unit tests (166 tests)
 ├── scripts/
-│   └── quick_train.py      # Training script
+│   └── train_cifar10.py    # Training script
 └── checkpoints/            # Saved models (gitignored)
 ```
 
