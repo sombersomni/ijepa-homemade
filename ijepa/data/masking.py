@@ -64,7 +64,36 @@ class MultiBlockMaskGenerator:
         Returns:
             Set of patch indices in the sampled block
         """
-        raise NotImplementedError("sample_block not yet implemented")
+        # Sample scale (fraction of total patches)
+        scale = random.uniform(*scale_range)
+        num_patches_in_block = int(self.num_patches * scale)
+
+        # Sample aspect ratio (width / height)
+        aspect_ratio = random.uniform(*aspect_ratio_range)
+
+        # Calculate block dimensions
+        # height * width = num_patches_in_block
+        # width / height = aspect_ratio
+        # Therefore: height = sqrt(num_patches_in_block / aspect_ratio)
+        block_height = int(round(math.sqrt(num_patches_in_block / aspect_ratio)))
+        block_width = int(round(block_height * aspect_ratio))
+
+        # Clamp to valid range [1, grid_size]
+        block_height = max(1, min(block_height, self.height))
+        block_width = max(1, min(block_width, self.width))
+
+        # Sample top-left corner position
+        top = random.randint(0, self.height - block_height)
+        left = random.randint(0, self.width - block_width)
+
+        # Get patch indices in the block
+        indices = set()
+        for row in range(top, top + block_height):
+            for col in range(left, left + block_width):
+                patch_idx = row * self.width + col
+                indices.add(patch_idx)
+
+        return indices
 
     def __call__(self) -> tuple[list[int], list[list[int]]]:
         """
@@ -75,4 +104,25 @@ class MultiBlockMaskGenerator:
             target_indices_list: List of M sorted lists, each containing
                                 patch indices for one target block
         """
-        raise NotImplementedError("MultiBlockMaskGenerator.__call__ not yet implemented")
+        # Sample target blocks
+        target_indices_list = []
+        all_target_indices = set()
+
+        for _ in range(self.num_targets):
+            target_block = self.sample_block(
+                self.target_scale, self.target_aspect_ratio
+            )
+            target_indices_list.append(target_block)
+            all_target_indices.update(target_block)
+
+        # Sample context block (large, square)
+        context_block = self.sample_block(self.context_scale, (1.0, 1.0))
+
+        # Remove target patches from context (ensure non-trivial prediction)
+        context_indices = context_block - all_target_indices
+
+        # Convert to sorted lists
+        context_indices = sorted(list(context_indices))
+        target_indices_list = [sorted(list(t)) for t in target_indices_list]
+
+        return context_indices, target_indices_list

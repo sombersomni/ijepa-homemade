@@ -50,34 +50,95 @@ class IJEPA(nn.Module):
     ):
         super().__init__()
         self.num_patches = (img_size // patch_size) ** 2
+        self.encoder_embed_dim = encoder_embed_dim
 
-        # TODO: Initialize components
-        # self.context_encoder = ViTEncoder(...)
-        # self.target_encoder = copy.deepcopy(self.context_encoder)
-        # self.target_encoder.requires_grad_(False)  # No gradients for EMA
-        # self.predictor = Predictor(...)
-        raise NotImplementedError("IJEPA not yet implemented")
+        # Context encoder: trainable, processes only visible context patches
+        self.context_encoder = ViTEncoder(
+            img_size=img_size,
+            patch_size=patch_size,
+            in_channels=in_channels,
+            embed_dim=encoder_embed_dim,
+            depth=encoder_depth,
+            num_heads=encoder_num_heads,
+            mlp_ratio=mlp_ratio,
+        )
+
+        # Target encoder: EMA copy, processes full image, no gradients
+        self.target_encoder = copy.deepcopy(self.context_encoder)
+        self.target_encoder.requires_grad_(False)
+
+        # Predictor: predicts target representations from context
+        self.predictor = Predictor(
+            num_patches=self.num_patches,
+            context_dim=encoder_embed_dim,
+            predictor_dim=predictor_embed_dim,
+            depth=predictor_depth,
+            num_heads=predictor_num_heads,
+            mlp_ratio=mlp_ratio,
+        )
 
     def forward(
         self,
         images: torch.Tensor,
-        context_indices: list[list[int]],
-        target_indices_list: list[list[list[int]]],
+        context_indices: list[int] | list[list[int]],
+        target_indices_list: list[list[int]] | list[list[list[int]]],
     ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
         """
         Forward pass for I-JEPA training.
 
         Args:
             images: Input images (B, C, H, W)
-            context_indices: List of context patch indices for each sample
-            target_indices_list: List of M target block indices for each sample
-                                Shape: [batch_size][num_target_blocks][patches_per_block]
+            context_indices: Context patch indices (flat list or per-sample list)
+            target_indices_list: List of M target blocks, each a list of patch indices
 
         Returns:
             predictions: List of M predicted representations, each (B, num_patches, embed_dim)
             targets: List of M target representations (detached), each (B, num_patches, embed_dim)
         """
-        raise NotImplementedError("IJEPA.forward not yet implemented")
+        device = images.device
+
+        # Normalize indices format
+        if isinstance(context_indices[0], list):
+            ctx_indices = context_indices[0]
+        else:
+            ctx_indices = context_indices
+
+        # Handle target indices - can be [M][patches] or [B][M][patches]
+        if isinstance(target_indices_list[0][0], list):
+            # Format: [B][M][patches] - take first sample's targets
+            tgt_blocks = target_indices_list[0]
+        else:
+            # Format: [M][patches]
+            tgt_blocks = target_indices_list
+
+        # ============ Target Branch (no gradients) ============
+        with torch.no_grad():
+            # Target encoder processes full image
+            target_output = self.target_encoder(images)  # (B, num_patches, embed_dim)
+
+            # Extract target block representations
+            targets = []
+            for tgt_indices in tgt_blocks:
+                tgt_tensor = torch.tensor(tgt_indices, device=device)
+                target_patches = target_output[:, tgt_tensor, :]  # (B, T, embed_dim)
+                targets.append(target_patches)
+
+        # ============ Context Branch ============
+        # Get patch embeddings from context encoder's patch_embed
+        patch_embeddings = self.context_encoder.patch_embed(images)  # (B, num_patches, embed_dim)
+
+        # Context encoder processes only context patches
+        context_output = self.context_encoder(
+            patch_embeddings, patch_indices=[ctx_indices]
+        )  # (B, num_context, embed_dim)
+
+        # ============ Predictor ============
+        predictions = []
+        for tgt_indices in tgt_blocks:
+            pred = self.predictor(context_output, ctx_indices, tgt_indices)
+            predictions.append(pred)
+
+        return predictions, targets
 
     def get_target_encoder(self) -> ViTEncoder:
         """
@@ -86,14 +147,19 @@ class IJEPA(nn.Module):
         Returns:
             The EMA-updated target encoder
         """
-        raise NotImplementedError("IJEPA.get_target_encoder not yet implemented")
+        return self.target_encoder
 
     @torch.no_grad()
     def update_target_encoder(self, momentum: float) -> None:
         """
         Update target encoder with EMA of context encoder.
 
+        Formula: θ̄ = momentum * θ̄ + (1 - momentum) * θ
+
         Args:
-            momentum: EMA momentum (0.996 -> 1.0 during training)
+            momentum: EMA momentum (typically 0.996 -> 1.0 during training)
         """
-        raise NotImplementedError("IJEPA.update_target_encoder not yet implemented")
+        for param_t, param_s in zip(
+            self.target_encoder.parameters(), self.context_encoder.parameters()
+        ):
+            param_t.data.mul_(momentum).add_(param_s.data, alpha=1 - momentum)
