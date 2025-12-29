@@ -18,18 +18,18 @@ if __name__ == "__main__":
         'predictor_embed_dim': 96,
         'predictor_depth': 4,
         'batch_size': 256,
-        'epochs': 100,
+        'epochs': 300,
         'lr': 1e-3,
         'min_lr': 1e-5,
         'weight_decay': 0.05,
-        'warmup_epochs': 10,
+        'warmup_epochs': 30,
         'ema_momentum_start': 0.996,
         'ema_momentum_end': 1.0,
         'num_targets': 4,
         'target_scale': (0.15, 0.25),
         'context_scale': (0.75, 0.95),
         'data_dir': './data',
-        'save_dir': './checkpoints',
+        'save_dir': './checkpoints_300ep',
     }
 
     print("=" * 60)
