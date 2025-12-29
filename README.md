@@ -236,7 +236,9 @@ Epoch   Loss    Notes
 1       ~250    Initial random predictions
 10      ~70     Learning basic structure
 50      ~45     Capturing semantic features
-100     ~37     Converged representations
+100     ~37     Good representations
+200     ~25     Improved representations
+300     ~20     Best representations
 ```
 
 The loss measures L2 distance in representation space - lower means the predictor can better anticipate target representations from context.
@@ -250,10 +252,14 @@ After training, we evaluate by:
 2. Extracting features (global average pooling over patches)
 3. Training a linear classifier on frozen features
 
-**Actual results with this implementation (100 epochs):**
-- **Target Encoder: 70.10% test accuracy**
-- **Context Encoder: 70.33% test accuracy**
-- For comparison: supervised ViT on CIFAR-10 achieves ~85%+
+**Actual results with this implementation:**
+
+| Epochs | Target Encoder | Context Encoder | Final Loss |
+|--------|----------------|-----------------|------------|
+| 100    | 70.10%         | 70.33%          | ~37        |
+| 300    | **72.91%**     | **72.86%**      | ~20        |
+
+For comparison: supervised ViT on CIFAR-10 achieves ~85%+
 
 ### Why Accuracy Isn't Everything
 
