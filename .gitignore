@@ -44,6 +44,15 @@ wandb/
 tensorboard/
 *.log
 
+# Images (except README assets)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+!tsne_target_encoder.png
+
 # Jupyter notebooks
 .ipynb_checkpoints/
 
