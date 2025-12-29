@@ -8,6 +8,8 @@ Uses mask tokens with positional embeddings to indicate prediction locations.
 import torch
 import torch.nn as nn
 
+from ijepa.models.vit import TransformerBlock
+
 
 class Predictor(nn.Module):
     """
@@ -49,40 +51,90 @@ class Predictor(nn.Module):
         self.context_dim = context_dim
         self.predictor_dim = predictor_dim
 
-        # TODO: Implement predictor components
-        # self.input_proj = nn.Linear(context_dim, predictor_dim)
-        #
-        # # Shared mask token embedding (learned)
-        # self.mask_token = nn.Parameter(torch.zeros(1, 1, predictor_dim))
-        # nn.init.normal_(self.mask_token, std=0.02)
-        #
-        # # Predictor's own positional embeddings
-        # self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, predictor_dim))
-        # nn.init.normal_(self.pos_embed, std=0.02)
-        #
-        # # Transformer blocks
-        # self.blocks = nn.ModuleList([...])
-        # self.norm = nn.LayerNorm(predictor_dim)
-        #
-        # # Project back to context encoder dimension
-        # self.output_proj = nn.Linear(predictor_dim, context_dim)
-        raise NotImplementedError("Predictor not yet implemented")
+        # Project from context encoder dimension to narrow predictor dimension
+        self.input_proj = nn.Linear(context_dim, predictor_dim)
+
+        # Shared mask token embedding (learned)
+        # This single vector is combined with positional embeddings for each target
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, predictor_dim))
+        nn.init.normal_(self.mask_token, std=0.02)
+
+        # Predictor's own positional embeddings
+        self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, predictor_dim))
+        nn.init.normal_(self.pos_embed, std=0.02)
+
+        # Transformer blocks (narrower than encoder)
+        self.blocks = nn.ModuleList([
+            TransformerBlock(predictor_dim, num_heads, mlp_ratio, dropout=0.0)
+            for _ in range(depth)
+        ])
+        self.norm = nn.LayerNorm(predictor_dim)
+
+        # Project back to context encoder dimension for loss computation
+        self.output_proj = nn.Linear(predictor_dim, context_dim)
 
     def forward(
         self,
         context_output: torch.Tensor,
-        context_positions: list[list[int]],
-        target_positions: list[list[int]],
+        context_positions: list[int] | list[list[int]],
+        target_positions: list[int] | list[list[int]],
     ) -> torch.Tensor:
         """
         Predict target representations from context.
 
         Args:
             context_output: Context encoder output (B, num_context_patches, context_dim)
-            context_positions: List of patch indices in context for each sample
-            target_positions: List of patch indices to predict for each sample
+            context_positions: Patch indices in context (list of ints, or list of lists for per-sample)
+            target_positions: Patch indices to predict (list of ints, or list of lists for per-sample)
 
         Returns:
             predictions: Predicted target representations (B, num_target_patches, context_dim)
         """
-        raise NotImplementedError("Predictor.forward not yet implemented")
+        B = context_output.shape[0]
+        device = context_output.device
+
+        # Handle both flat list and nested list formats
+        # For simplicity, assume same mask for all samples in batch (common in I-JEPA)
+        if isinstance(context_positions[0], list):
+            ctx_indices = context_positions[0]
+        else:
+            ctx_indices = context_positions
+
+        if isinstance(target_positions[0], list):
+            tgt_indices = target_positions[0]
+        else:
+            tgt_indices = target_positions
+
+        # Convert to tensors
+        ctx_indices_tensor = torch.tensor(ctx_indices, device=device)
+        tgt_indices_tensor = torch.tensor(tgt_indices, device=device)
+
+        # 1. Project context to predictor dimension
+        context_tokens = self.input_proj(context_output)  # (B, C, predictor_dim)
+
+        # 2. Add positional embeddings to context tokens
+        context_pos = self.pos_embed[:, ctx_indices_tensor, :]  # (1, C, predictor_dim)
+        context_tokens = context_tokens + context_pos
+
+        # 3. Create mask tokens for target positions
+        # mask_token: (1, 1, predictor_dim) + pos_embed subset: (1, T, predictor_dim)
+        target_pos = self.pos_embed[:, tgt_indices_tensor, :]  # (1, T, predictor_dim)
+        mask_tokens = self.mask_token + target_pos  # (1, T, predictor_dim)
+        mask_tokens = mask_tokens.expand(B, -1, -1)  # (B, T, predictor_dim)
+
+        # 4. Concatenate: [context_tokens, mask_tokens]
+        x = torch.cat([context_tokens, mask_tokens], dim=1)  # (B, C+T, predictor_dim)
+
+        # 5. Process through transformer blocks
+        for block in self.blocks:
+            x = block(x)
+        x = self.norm(x)
+
+        # 6. Extract only the predictions (the mask token positions)
+        num_context = len(ctx_indices)
+        predictions = x[:, num_context:, :]  # (B, T, predictor_dim)
+
+        # 7. Project back to context encoder dimension
+        predictions = self.output_proj(predictions)  # (B, T, context_dim)
+
+        return predictions
